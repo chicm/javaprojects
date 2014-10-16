@@ -1,6 +1,8 @@
 *.class
 .settings
+.metadata
 bin/
+RemoteSystemsTempFiles/
 # Package Files #
 *.jar
 *.war
