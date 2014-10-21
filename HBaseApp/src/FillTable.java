@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HRegionLocation;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Durability;
@@ -18,14 +19,14 @@ import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
 
-//java -Xmx2048m -Djava.ext.dirs=/opt/ibm/java7/jre/lib/ext:/root/hbase/lib FillTable test4 100
+//java -Xmx2048m -Djava.ext.dirs=/opt/ibm/java7/jre/lib/ext:/root/hbase/lib FillTable test1 100
 
 public class FillTable implements Runnable{
 	
 	private static Configuration conf;
 	private static HashMap<Integer, String> map;
-	private static final int CACHE_NUMBER = 100000;
-	private static final int NUM_REGIONS = 4;
+	private static final int CACHE_NUMBER = 10000;
+	private static final int NUM_REGIONS = 6;
 	private int start =0;
 	private int end = 0;
 	private static String tableName = "";
@@ -39,12 +40,12 @@ public class FillTable implements Runnable{
 		conf = HBaseConfiguration.create();
 		map = new HashMap<Integer, String>();
 		for(int i = 0; i < 26; i++) {
-			char[] c = new char[40];
+			char[] c = new char[90];
 			Arrays.fill(c, (char)('A' + i));
 			map.put(i, new String(c));
 		}
 		for(int i = 0; i < 26; i++) {
-			char[] c = new char[40];
+			char[] c = new char[90];
 			Arrays.fill(c, (char)('a' + i));
 			map.put(i+26, new String(c));
 		}
@@ -60,11 +61,18 @@ public class FillTable implements Runnable{
 		long starttime = System.currentTimeMillis();
 		createTable(tableName, num);
 		
-		FillTable t1 = new FillTable(0, num/2-1);
-		FillTable t2 = new FillTable(num/2, num-1);
-		ExecutorService es = Executors.newFixedThreadPool(2); 
-		es.submit(t1);
-		es.submit(t2);
+		ExecutorService es = Executors.newFixedThreadPool(NUM_REGIONS);
+		FillTable[] threads = new FillTable[NUM_REGIONS];
+		int startkey = 0, endkey = num/NUM_REGIONS;
+		for(int i = 0; i < NUM_REGIONS; i++) {
+			threads[i]= new FillTable(startkey, endkey);
+			startkey = endkey +1;
+			endkey += num/NUM_REGIONS;
+			if(endkey >= num || num - endkey < 2)
+				endkey = num-1;
+			
+			es.submit(threads[i]);
+		}
 		es.shutdown();
 		try {
 			es.awaitTermination(Integer.MAX_VALUE, TimeUnit.MINUTES);
@@ -91,7 +99,8 @@ public class FillTable implements Runnable{
 			}
 			HTableDescriptor tableDesc = new HTableDescriptor(table);
 			tableDesc.addFamily(new HColumnDescriptor("f1"));
-			admin.createTable(tableDesc, genData(0).getBytes(), genData(num-1).getBytes(), NUM_REGIONS);
+			//admin.createTable(tableDesc, genData(0).getBytes(), genData(num-1).getBytes(), NUM_REGIONS);
+			admin.createTable(tableDesc, getSplits(num));
 			System.out.printf("table %s created\n", tableName);
 			admin.close();
 		} catch(Exception e) {
@@ -99,40 +108,59 @@ public class FillTable implements Runnable{
 		}
 	}
 	
+	public static byte[][] getSplits(int num) {
+		int key = num / NUM_REGIONS;
+		System.out.println("splits:");
+		byte[][] splits = new byte[NUM_REGIONS-1][];
+		for(int i = 0; i < NUM_REGIONS-1; i++) {
+			byte[] split = genKey(key).getBytes();
+			System.out.println(genKey(key));
+			splits[i] = split;
+			key += num / NUM_REGIONS;
+			
+		}
+		return splits;
+	}
+	
 	public static void insertData(String tableName, int startKey, int endKey) {
 		System.out.println("start insert data");
 		
 		try( HConnection connection = HConnectionManager.createConnection(conf);
 			HTableInterface table = connection.getTable(tableName)) {
-			table.setAutoFlush(false);
+			table.setAutoFlush(false); 
 		    // Use the table as needed, for a single operation and a single thread
+			HRegionLocation region = connection.getRegionLocation(TableName.valueOf(tableName), genData(startKey).getBytes(), true);
+			String id = String.format("[Thread-%d:%s:%s]", Thread.currentThread().getId(), region.getHostname(), region.getServerName().getServerName());
 			List<Put> list = new ArrayList<Put>(CACHE_NUMBER);
 			
 			for(int i = startKey; i <= endKey; i++) {
-				Put put = new Put(genData(i).getBytes());
+				Put put = new Put(genKey(i).getBytes());
 				put.setDurability(Durability.SKIP_WAL);
 				put.add("f1".getBytes(), "a".getBytes(), genData(i).getBytes());
 				list.add(put);
 				
 				if(i % 100000 == 0) {
-					System.out.printf("count:%d\n", i);
+					System.out.printf("%scount:%d\n",id, i);
 				}
 				
 				if( (i!=startKey && (i-startKey+1) % CACHE_NUMBER == 0) || i == endKey) {
-					System.out.printf("***PUT: n=%d, list.size=%d\n", i, list.size());
+					System.out.printf("***%sPUT: n=%d, list.size=%d\n", id, i, list.size());
 					table.put(list);
 					list.clear();
 				}
 			}
 			System.out.println("insert data finished");
-		} catch( Exception e) {
+		} 
+		catch( Exception e) {
 			e.printStackTrace(System.out);
-		}
-		
+		}		
 	}
 	
+	public static String genKey(int n) {
+		return String.format("%010d", n);
+	}
 	public static String genData(int n) {
-		return String.format("%010d%s", n, map.get(n%52));
+		return String.format("%s", map.get(n%52));
 	}
 
 }
