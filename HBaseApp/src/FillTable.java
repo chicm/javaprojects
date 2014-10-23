@@ -19,7 +19,7 @@ import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
 
-//java -Xmx2048m -Djava.ext.dirs=/opt/ibm/java7/jre/lib/ext:/root/hbase/lib FillTable test1 100
+//java -classpath $(hbase classpath) -Xmx2048m  FillTable test1 10000000
 
 public class FillTable implements Runnable{
 	
@@ -137,6 +137,8 @@ public class FillTable implements Runnable{
 				Put put = new Put(genKey(i).getBytes());
 				put.setDurability(Durability.SKIP_WAL);
 				put.add("f1".getBytes(), "a".getBytes(), genData(i).getBytes());
+				table.put(put);
+				/* remove cache
 				list.add(put);
 				
 				if(i % 100000 == 0) {
@@ -146,8 +148,8 @@ public class FillTable implements Runnable{
 				if( (i!=startKey && (i-startKey+1) % CACHE_NUMBER == 0) || i == endKey) {
 					System.out.printf("***%sPUT: n=%d, list.size=%d\n", id, i, list.size());
 					table.put(list);
-					list.clear();
-				}
+					list.clear(); 
+				}*/
 			}
 			System.out.println("insert data finished");
 		} 
