@@ -19,7 +19,7 @@ import org.apache.hadoop.hbase.client.HConnectionManager;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
 
-//java -classpath $(hbase classpath) -Xmx2048m  FillTable test1 10000000
+//java -classpath $(hbase classpath) FillTable test1 10000000
 
 public class FillTable implements Runnable{
 	
