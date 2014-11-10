@@ -32,6 +32,8 @@ public class HelloWorldServer extends Thread{
 			channel.socket().setReuseAddress(true);
 			channel.socket().bind(new InetSocketAddress(9999));
 			
+			System.out.printf("SERVER THREAD[%s]:register\n", Thread.currentThread().getName() ); 
+
 			channel.register(selector, SelectionKey.OP_ACCEPT );
 			
 			while(selector.select() > 0 ) {
@@ -69,7 +71,7 @@ public class HelloWorldServer extends Thread{
 					byte[] data = new byte[len];
 					buf.get(data);
 					String msg = new String(data);
-					System.out.println("sever received:["  + msg + "]" ); 
+					System.out.printf("SERVER THREAD[%s]:received:[%s]\n", Thread.currentThread().getName(), msg ); 
 				} else {
 					socketChannel.close();
 				}
@@ -81,13 +83,16 @@ public class HelloWorldServer extends Thread{
 }
 
 class HelloWorldClient implements Runnable {
+	private static final int NTHREADS = 50;
 	
 	public static void sendData() {
-		ExecutorService es = Executors.newFixedThreadPool(50);
+		ExecutorService es = Executors.newFixedThreadPool(NTHREADS);
 		Thread[] threads = new Thread[50];
-		for(Thread t: threads) {
-			t = new Thread(new HelloWorldClient());
-			es.submit(t);
+		for(int i = 0; i < NTHREADS; i++) {
+			threads[i] = new Thread(new HelloWorldClient());
+			threads[i].setName(String.format("CLIENT%02d", i));
+			es.submit(threads[i]);
+			
 		}
 		try {
 			es.awaitTermination(Integer.MAX_VALUE, TimeUnit.DAYS);
@@ -101,7 +106,8 @@ class HelloWorldClient implements Runnable {
 			SocketAddress adr = new InetSocketAddress("localhost", 9999);
 			channel.connect(adr);
 			
-			for(int i =0; i< 20; i++) {
+			for(int i =0; i< 1; i++) {
+			//Thread.currentThread().setName(String.format("CLIENT%02d", i));
 			String str = Thread.currentThread().getName() + " Hello";
 			byte[] bytes = str.getBytes();
 			ByteBuffer buf = ByteBuffer.wrap(bytes);
