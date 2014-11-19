@@ -20,6 +20,21 @@ class AddPerson {
 
     return person.build();
   }
+  
+  static Person newPerson(int id, String name, String email, String phone) {
+    Person.Builder person = Person.newBuilder();
+
+    person.setId(id);
+    person.setName(name);
+    person.setEmail(email);
+
+    Person.PhoneNumber.Builder phoneNumber =
+        Person.PhoneNumber.newBuilder().setNumber(phone);
+      phoneNumber.setType(Person.PhoneType.MOBILE);
+      person.addPhone(phoneNumber);
+
+    return person.build();
+  }
 
   public static void main(String[] args) throws Exception {
     AddressBook.Builder addressBook = AddressBook.newBuilder();

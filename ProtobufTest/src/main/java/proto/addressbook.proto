@@ -2,10 +2,17 @@ package proto.generated;
 
 option java_package = "proto.generated";
 option java_outer_classname = "AddressBookProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+option optimize_for = SPEED;
+
+message Name {
+  optional string name = 1;
+}
 
 message Person {
-  required string name = 1;
-  required int32 id = 2;
+  optional string name = 1;
+  optional int32 id = 2;
   optional string email = 3;
 
   enum PhoneType {
@@ -24,4 +31,14 @@ message Person {
 
 message AddressBook {
   repeated Person person = 1;
+}
+
+message RequestHeader {
+  optional uint32 call_id = 1;
+  optional string method_name = 2;
+}
+
+service PersonService {
+  rpc search(Name)  returns(Person);
+  rpc add(Person) returns(Person);
 }
